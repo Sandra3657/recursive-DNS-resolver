@@ -26,26 +26,27 @@ def parse_dns(dns_raw)
   dns_raw.each do |line|
     record = line.split(",")
 
-    key1 = record.shift.strip.to_sym   #key1 is the record type, either :A or :CNAME
-    dns_records[key1] ||= {}
-    key2 = record.shift.strip.to_sym  #key2 is the source domain
-    dns_records[key1][key2] = record.first.strip
+    domain_name = record[1].strip
+    dns_records[domain_name] = {
+      :type => record[0].strip,
+      :target => record[2].strip,
+    }
   end
   return dns_records
 end
 
 def resolve(dns_records, lookup_chain, domain)
-  domain = domain.to_sym
-
-  if dns_records[:A][domain] != nil # If domain is present in A record type
-    lookup_chain.append(dns_records[:A][domain])
-  elsif dns_records[:CNAME][domain] != nil # If domain is in CNAME record type
-    lookup_chain.append(dns_records[:CNAME][domain])
-    resolve(dns_records, lookup_chain, dns_records[:CNAME][domain])
+  record = dns_records[domain]
+  if (!record)
+    lookup_chain.replace(["Error: record not found for #{lookup_chain.first}"])
+  elsif record[:type] == "CNAME"
+    lookup_chain.append(record[:target])
+    resolve(dns_records, lookup_chain, record[:target])
+  elsif record[:type] == "A"
+    lookup_chain.append(record[:target])
   else
-    lookup_chain.replace(["Error: record not found for #{lookup_chain.first}"])   # If domain is not present in both A and CNAME record type
+    lookup_chain.replace(["Invalid record type for #{lookup_chain.first}"])
   end
-  return lookup_chain
 end
 
 # To complete the assignment, implement `parse_dns` and `resolve`.
